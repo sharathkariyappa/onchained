@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 30008;
 app.use(cors()); // Optional if your frontend is hosted elsewhere
 app.use(express.json());
 
-// Proxy endpoint
+// Proxy endpoint for latest prices
 app.get("/api/prices", async (req, res) => {
   try {
     const response = await fetch("https://www.universal.xyz/api/v1/prices/latest");
@@ -21,45 +21,41 @@ app.get("/api/prices", async (req, res) => {
   }
 });
 
+// New endpoint for historical price data
+app.get("/api/prices/historical", async (req, res) => {
+  try {
+    // Get query parameters with defaults
+    const { symbol, range} = req.query;
+    
+    // Validate range parameter
+    if (!['1d', '1w'].includes(range)) {
+      return res.status(400).json({ 
+        error: 'Invalid range parameter. Use "1d" for 1 day or "1w" for 1 week.' 
+      });
+    }
 
-// app.post("/api/quote", async (req, res) => {
-//   const { amount, address, Buyaddress} = req.body;
+    // Validate symbols parameter (optional validation)
+    if (!symbol || typeof symbol !== 'string') {
+      return res.status(400).json({ error: 'Invalid symbols parameter.' });
+    }
 
-//   if (!amount || !address || isNaN(Number(amount))) {
-//     return res.status(400).json({ error: "Missing or invalid parameters." });
-//   }
-
-//   try {
-//     const usdcAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606EB48";
-//     const buyToken = Buyaddress;
-//     const chainId = 8453
-
-//     if (!buyToken) {
-//       return res.status(400).json({ error: "Unsupported token" });
-//     }
-
-//     const parsedAmount = parseInt(amount.toString(), 6); // USDC has 6 decimals
-
-//     const { data } = await axios.get("https://api.0x.org/gasless/quote", {
-//       params: {
-//         chainId,
-//         sellToken: usdcAddress,
-//         buyToken,
-//         sellAmount: parsedAmount,
-//         taker: address,
-//       },
-//       headers: {
-//         "0x-api-key": "e4f5a5a7-d746-41c6-a1ca-a9bc46ec3c31",
-//         "0x-version": "v2",
-//       },
-//     });
-
-//     res.json(data);
-//   } catch (error) {
-//     console.error("Error fetching 0x quote:", error?.response?.data || error.message);
-//     res.status(500).json({ error: "Failed to fetch 0x quote", details: error?.message });
-//   }
-// });
+    const endpoint = `https://www.universal.xyz/api/v1/prices/historical?symbols=${symbol}&range=${range}`;
+    const response = await fetch(endpoint);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error("Error fetching historical prices:", err);
+    res.status(500).json({ 
+      error: "Failed to fetch historical price data", 
+      details: err?.message 
+    });
+  }
+});
 
 app.post("/api/quote", async (req, res) => {
   const { tradeType, symbol, amount, address, slippage } = req.body;
@@ -116,6 +112,7 @@ app.post("/api/order", async (req, res) => {
     return res.status(500).json({ error: 'Failed to submit order' });
   }
 });
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
